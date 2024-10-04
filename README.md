@@ -60,7 +60,6 @@ Some things are still TODO:
 - [ ] Some data points are obviously wrong
 - [ ] Use PMTiles tiles for real offline usage
 - [ ] Improve search to be a bit more fuzzy (but make it work with the chunks)
-- [ ] Implement URL-based state recording so we can share links to specific doctors or search results
 - [ ] Simplify the map style
 
 ## License

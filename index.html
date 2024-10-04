@@ -308,9 +308,53 @@
       <div id="loadingText">Lade Daten...</div>
     </div>
     <script>
-      const map = L.map("map", { zoomControl: false }).setView([48.2082, 16.3738], 12);
+      // Add these new functions at the beginning of the script
 
-      // add zoom control bottom right
+      function updateURLParams() {
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        const name = document.getElementById("nameInput").value;
+        const fach = document.getElementById("fachSelect").value;
+        const district = document.getElementById("districtSelect").value;
+
+        const params = new URLSearchParams();
+        params.set('lat', center.lat.toFixed(6));
+        params.set('lon', center.lng.toFixed(6));
+        params.set('zoom', zoom);
+        if (name) params.set('name', encodeURIComponent(name));
+        if (fach) params.set('fach', encodeURIComponent(fach));
+        if (district) params.set('district', district);
+
+        const newURL = `${window.location.pathname}?${params.toString()}`;
+        history.replaceState(null, '', newURL);
+      }
+
+      function loadURLParams() {
+        const params = new URLSearchParams(window.location.search);
+        const lat = parseFloat(params.get('lat'));
+        const lon = parseFloat(params.get('lon'));
+        const zoom = parseInt(params.get('zoom'));
+        const name = params.get('name');
+        const fach = params.get('fach');
+        const district = params.get('district');
+
+        if (!isNaN(lat) && !isNaN(lon) && !isNaN(zoom)) {
+          map.setView([lat, lon], zoom);
+        }
+
+        if (name) document.getElementById("nameInput").value = decodeURIComponent(name);
+        if (fach) document.getElementById("fachSelect").value = decodeURIComponent(fach);
+        if (district) document.getElementById("districtSelect").value = district;
+
+        if (name || fach || district) {
+          searchDoctors();
+        }
+      }
+
+      // Modify the map initialization to include moveend event
+      const map = L.map("map", { zoomControl: false }).setView([48.2082, 16.3738], 12);
+      map.on('moveend', updateURLParams);
+
       L.control.zoom({
         position: "bottomright",
       }).addTo(map);
@@ -407,7 +451,6 @@
       }
 
       async function searchDoctors() {
-        showLoading();
         try {
           // Clear previous results
           markers.clearLayers();
@@ -487,6 +530,9 @@
           const doctorCount = document.createElement('p');
           doctorCount.textContent = `${filteredDoctors.length} Ärzte gefunden`;
           document.getElementById('doctorList').prepend(doctorCount);
+
+          // Update URL params after search
+          updateURLParams();
         } finally {
           hideLoading();
         }
@@ -556,6 +602,9 @@
 
         // Clear loaded chunks
         loadedChunks.clear();
+
+        // Update URL params after clearing
+        updateURLParams();
       }
 
       async function loadAllDoctors() {
@@ -634,7 +683,8 @@
             fachSelect.appendChild(option);
           });
 
-          // loadAllDoctors(); // Load all doctors initially
+          // Load URL params and execute search if necessary
+          loadURLParams();
         })
         .catch((error) => console.error("Error loading data:", error));
 
