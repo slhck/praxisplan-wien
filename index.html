@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Praxisplan Wien</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+      #search {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      #search input,
+      #search select,
+      #search button {
+        font-size: 16px;
+        margin-bottom: 5px;
+        margin-right: 5px;
+        width: calc(100% - 10px);
+      }
+      #locationButton {
+        position: absolute;
+        bottom: 20px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="search">
+      <input type="text" id="nameInput" placeholder="Nachname" />
+      <select id="fachSelect">
+        <option value="">Alle Fächer</option>
+      </select>
+      <select id="districtSelect">
+        <option value="">Alle Bezirke</option>
+      </select>
+      <button onclick="searchDoctors()">Filtern</button>
+      <button onclick="clearSearch()">Suche leeren</button>
+    </div>
+    <button id="locationButton" onclick="getCurrentLocation()">
+      Mein Standort
+    </button>
+    <script>
+      const map = L.map("map").setView([48.2082, 16.3738], 12);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+      }).addTo(map);
+
+      const markers = L.markerClusterGroup();
+      map.addLayer(markers);
+
+      let allDoctors = [];
+      let dataIndex = null;
+      let loadedChunks = new Set();
+      let uniqueDoctors = new Set();
+
+      function addUniqueDoctor(doctor) {
+        const objectId = doctor.properties.OBJECTID;
+        if (!uniqueDoctors.has(objectId)) {
+          uniqueDoctors.add(objectId);
+          return true;
+        }
+        return false;
+      }
+
+      // Function to create a popup content
+      function createPopupContent(properties) {
+        return `
+                <a href="${properties.INTERNET}" target="_blank">
+                  <strong>${properties.NAME}</strong>
+                </a><br>
+                <i>${properties.FACH}</i><br>
+                ${properties.ADRESSE}<br>
+                Tel: ${properties.TELEFON || "Keine Nummer verfügbar"}<br>
+            `;
+      }
+
+      // Function to add markers to the map
+      function addMarkers(doctors) {
+        markers.clearLayers();
+        uniqueDoctors.clear();
+        for (const doctor of doctors) {
+          if (addUniqueDoctor(doctor)) {
+            const [lon, lat] = doctor.geometry.coordinates;
+            const marker = L.marker([lat, lon]);
+            marker.bindPopup(createPopupContent(doctor.properties));
+            markers.addLayer(marker);
+          }
+        }
+      }
+
+      async function loadChunk(chunkKey) {
+        if (loadedChunks.has(chunkKey)) return;
+        const response = await fetch(`data_chunks/chunk_${chunkKey}.json`);
+        const chunkData = await response.json();
+        chunkData.forEach((doctor) => {
+          if (addUniqueDoctor(doctor)) {
+            allDoctors.push(doctor);
+          }
+        });
+        loadedChunks.add(chunkKey);
+      }
+
+      const loadChunks = async (chunks) => {
+        for (const chunk of chunks) {
+          await loadChunk(chunk);
+        }
+      };
+
+      async function searchDoctors() {
+        const name = document
+          .getElementById("nameInput")
+          .value.trim()
+          .toUpperCase();
+        const fach = document.getElementById("fachSelect").value;
+        const district = document.getElementById("districtSelect").value;
+
+        if (name === "" && fach === "" && district === "") {
+          alert("Bitte geben Sie einen Namen, ein Fach oder einen Bezirk ein.");
+          return;
+        }
+
+        // relevant chunks are:
+        // - If only name is set, the chunk that contains the first letter of the name
+        // - If only fach is set, the chunk that contains the fach
+        // - If only district is set, then search by name chunks (but not fach chunks)
+        // - If name and district are set, then search by name chunks (but not fach chunks)
+        // - If name and fach are set, then search by name chunks (but not district chunks)
+        // - If fach and district are set, then search by fach chunks (but not name chunks)
+        // - If all are set, then search by name chunks (but not fach chunks)
+
+        const relevantNameChunks = dataIndex.name_chunks.filter((chunk) => {
+          const [_, letter, chunkDistrict] = chunk.split("_");
+          return (
+            (name === "" || letter === name[0]) &&
+            (district === "" || chunkDistrict === district)
+          );
+        });
+
+        const sanitizedFach = Object.keys(dataIndex.fach_mapping).find(
+          (key) => dataIndex.fach_mapping[key] === fach
+        );
+        const relevantFachChunks = dataIndex.fach_chunks.filter((chunk) => {
+          const [_, chunkFach, chunkDistrict] = chunk.split("_");
+          return (
+            (fach === "" || chunkFach === sanitizedFach) &&
+            (district === "" || chunkDistrict === district)
+          );
+        });
+
+        // Load the right set of chunks
+        const chunksToLoad = [];
+        if (name !== "") {
+          chunksToLoad.push(...relevantNameChunks);
+        } else if (fach !== "" && name === "") {
+          chunksToLoad.push(...relevantFachChunks);
+        } else if (name !== "" && fach !== "") {
+          chunksToLoad.push(...relevantNameChunks);
+        } else if (district !== "" && name === "") {
+          chunksToLoad.push(...relevantNameChunks);
+        } else if (district !== "" && fach !== "") {
+          chunksToLoad.push(...relevantFachChunks);
+        }
+        console.log("Chunks to load:", chunksToLoad);
+        await loadChunks(chunksToLoad);
+
+        const filteredDoctors = allDoctors.filter((doctor) => {
+          const doctorName = doctor.properties.NAME.toUpperCase();
+          const doctorFach = doctor.properties.FACH.toUpperCase();
+          const doctorDistrict =
+            doctor.properties.ADRESSE.split(",")[0].split(".")[0];
+          return (
+            (name === "" || doctorName.includes(name)) &&
+            (fach === "" || doctorFach === fach.toUpperCase()) &&
+            (district === "" || doctorDistrict === district)
+          );
+        });
+
+        addMarkers(filteredDoctors);
+      }
+
+      function clearSearch() {
+        document.getElementById("nameInput").value = "";
+        document.getElementById("fachSelect").value = "";
+        document.getElementById("districtSelect").value = "";
+        // loadAllDoctors();
+      }
+
+      async function loadAllDoctors() {
+        const allChunks = [...dataIndex.name_chunks, ...dataIndex.fach_chunks];
+        for (const chunk of allChunks) {
+          await loadChunk(chunk);
+        }
+        addMarkers(allDoctors);
+      }
+
+      // Function to get and focus on the current location
+      function getCurrentLocation() {
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            function (position) {
+              const lat = position.coords.latitude;
+              const lon = position.coords.longitude;
+              map.setView([lat, lon], 15);
+              L.marker([lat, lon])
+                .addTo(map)
+                .bindPopup("Ihr Standort")
+                .openPopup();
+            },
+            function (error) {
+              alert("Fehler beim Abrufen des Standorts: " + error.message);
+            }
+          );
+        } else {
+          alert("Geolocation wird von Ihrem Browser nicht unterstützt.");
+        }
+      }
+
+      // Initialize by loading the index and populating the district and fach selects
+      fetch("data_chunks/index.json")
+        .then((response) => response.json())
+        .then((index) => {
+          dataIndex = index;
+          const districts = new Set();
+
+          // Properly extract districts from chunk names
+          dataIndex.name_chunks.forEach((chunk) => {
+            const parts = chunk.split("_");
+            if (parts.length === 3 && !isNaN(parts[2])) {
+              districts.add(parts[2]);
+            }
+          });
+
+          const faecher = new Set(Object.values(dataIndex.fach_mapping));
+
+          const sortedDistricts = Array.from(districts).sort(
+            (a, b) => parseInt(a) - parseInt(b)
+          );
+          const sortedFaecher = Array.from(faecher).sort();
+
+          const districtSelect = document.getElementById("districtSelect");
+          const fachSelect = document.getElementById("fachSelect");
+
+          sortedDistricts.forEach((district) => {
+            const option = document.createElement("option");
+            option.value = district;
+            option.textContent = `${district}.`;
+            districtSelect.appendChild(option);
+          });
+
+          sortedFaecher.forEach((fach) => {
+            const option = document.createElement("option");
+            option.value = fach;
+            option.textContent = fach;
+            fachSelect.appendChild(option);
+          });
+
+          // loadAllDoctors(); // Load all doctors initially
+        })
+        .catch((error) => console.error("Error loading data:", error));
+    </script>
+  </body>
+</html>
