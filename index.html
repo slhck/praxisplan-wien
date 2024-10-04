@@ -19,57 +19,163 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <style>
-      body,
-      html {
+      :root {
+        --primary-color: #3498db;
+        --secondary-color: #2c3e50;
+        --background-color: #f5f5f5;
+        --text-color: #333;
+        --shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      body, html {
         margin: 0;
         padding: 0;
         height: 100%;
+        width: 100%;
+        font-family: 'Helvetica Neue', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+      }
+      .container {
+        display: flex;
+        height: 100%;
+        width: 100%;
+      }
+      #sidebar {
+        width: 350px;
+        height: 100%;
+        background-color: white;
+        padding: 20px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        box-shadow: var(--shadow);
       }
       #map {
-        width: 100%;
+        flex-grow: 1;
         height: 100%;
       }
+      h1 {
+        color: var(--primary-color);
+        margin-bottom: 20px;
+      }
+      a {
+        color: var(--primary-color);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
       #search {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 1000;
-        background: white;
-        padding: 10px;
-        border-radius: 5px;
+        margin-bottom: 20px;
       }
       #search input,
       #search select,
       #search button {
-        font-size: 16px;
-        margin-bottom: 5px;
-        margin-right: 5px;
-        width: calc(100% - 10px);
+        font-size: 14px;
+        margin-bottom: 10px;
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: inherit;
+      }
+      #search button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      #search button:hover {
+        background-color: #2980b9;
+      }
+      #doctorList {
+        flex-grow: 1;
+        overflow-y: auto;
+      }
+      .doctor-item {
+        background-color: white;
+        margin-bottom: 15px;
+        padding: 15px;
+        border-radius: 4px;
+        box-shadow: var(--shadow);
+        transition: transform 0.2s;
+        cursor: pointer;
+      }
+      .doctor-item:hover {
+        transform: translateY(-2px);
       }
       #locationButton {
         position: absolute;
         bottom: 20px;
-        right: 10px;
+        right: 20px;
         z-index: 1000;
         background: white;
-        padding: 10px;
-        border-radius: 5px;
+        padding: 10px 15px;
+        border-radius: 4px;
         cursor: pointer;
+        font-family: inherit;
+        box-shadow: var(--shadow);
+        border: none;
+        transition: background-color 0.3s;
+      }
+      #locationButton:hover {
+        background-color: #f0f0f0;
+      }
+      .leaflet-container {
+        font: inherit;
+      }
+      .leaflet-container a {
+        color: var(--primary-color);
+        text-decoration: none;
+      }
+      .leaflet-container a:hover {
+        text-decoration: underline;
+      }
+      .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+        color: var(--text-color);
+        font-family: inherit;
+      }
+      #footer {
+        font-size: 12px;
+        color: #777;
+        margin-top: 20px;
+      }
+      #footer a {
+        color: var(--primary-color);
+        text-decoration: none;
+      }
+      #footer a:hover {
+        text-decoration: underline;
       }
     </style>
   </head>
   <body>
-    <div id="map"></div>
-    <div id="search">
-      <input type="text" id="nameInput" placeholder="Nachname" />
-      <select id="fachSelect">
-        <option value="">Alle Fächer</option>
-      </select>
-      <select id="districtSelect">
-        <option value="">Alle Bezirke</option>
-      </select>
-      <button onclick="searchDoctors()">Filtern</button>
-      <button onclick="clearSearch()">Suche leeren</button>
+    <div class="container">
+      <div id="sidebar">
+        <h1>Praxisplan Wien</h1>
+        <div id="search">
+          <input type="text" id="nameInput" placeholder="Nachname (oder Anfangsbuchstaben)" />
+          <select id="fachSelect">
+            <option value="">Alle Fächer</option>
+          </select>
+          <select id="districtSelect">
+            <option value="">Alle Bezirke</option>
+          </select>
+          <button onclick="searchDoctors()">Filtern</button>
+          <button onclick="clearSearch()">Suche leeren</button>
+        </div>
+        <div id="doctorList"></div>
+        <div id="footer">
+          <p>
+            Datenquelle: <a target="_blank" href="https://www.data.gv.at/katalog/dataset/arzte-standorte-wien">Ärzte Standorte Wien</a><br>
+            Lizenziert unter <a target="_blank" href="https://creativecommons.org/licenses/by/4.0/deed.de">Creative Commons BY 4.0</a><br>
+            Quellcode: <a target="_blank" href="https://github.com/slhck/praxisplan-wien">GitHub</a>
+          </p>
+        </div>
+      </div>
+      <div id="map"></div>
     </div>
     <button id="locationButton" onclick="getCurrentLocation()">
       Mein Standort
@@ -89,6 +195,7 @@
       let dataIndex = null;
       let loadedChunks = new Set();
       let uniqueDoctors = new Set();
+      let markerMap = new Map();
 
       function addUniqueDoctor(doctor) {
         const objectId = doctor.properties.OBJECTID;
@@ -102,7 +209,7 @@
       // Function to create a popup content
       function createPopupContent(properties) {
         return `
-                <a href="${properties.INTERNET}" target="_blank">
+                <a class="doctor-link" href="${properties.INTERNET}" target="_blank">
                   <strong>${properties.NAME}</strong>
                 </a><br>
                 <i>${properties.FACH}</i><br>
@@ -115,26 +222,76 @@
       function addMarkers(doctors) {
         markers.clearLayers();
         uniqueDoctors.clear();
+        markerMap.clear(); // Clear the marker map
+        const doctorListElement = document.getElementById('doctorList');
+        doctorListElement.innerHTML = '';
+
+        // Sort doctors by last name
+        doctors.sort((a, b) => {
+          const lastNameA = a.properties.NAME.split(' ').pop().toUpperCase();
+          const lastNameB = b.properties.NAME.split(' ').pop().toUpperCase();
+          return lastNameA.localeCompare(lastNameB);
+        });
+
         for (const doctor of doctors) {
           if (addUniqueDoctor(doctor)) {
             const [lon, lat] = doctor.geometry.coordinates;
             const marker = L.marker([lat, lon]);
             marker.bindPopup(createPopupContent(doctor.properties));
             markers.addLayer(marker);
+
+            // Store the marker reference
+            markerMap.set(doctor.properties.OBJECTID, marker);
+
+            // Add doctor to the list
+            const doctorItem = document.createElement('div');
+            doctorItem.className = 'doctor-item';
+            doctorItem.innerHTML = createPopupContent(doctor.properties);
+            doctorItem.addEventListener('click', () => {
+              const storedMarker = markerMap.get(doctor.properties.OBJECTID);
+              if (storedMarker) {
+                map.setView([lat, lon], 18); // Zoom in closer
+                markers.zoomToShowLayer(storedMarker, () => {
+                  storedMarker.openPopup();
+                  setTimeout(() => {
+                    map.panTo(storedMarker.getLatLng());
+                  }, 250);
+                });
+              }
+            });
+            doctorListElement.appendChild(doctorItem);
           }
         }
       }
 
       async function loadChunk(chunkKey) {
         if (loadedChunks.has(chunkKey)) return;
-        const response = await fetch(`data_chunks/chunk_${chunkKey}.json`);
-        const chunkData = await response.json();
-        chunkData.forEach((doctor) => {
-          if (addUniqueDoctor(doctor)) {
-            allDoctors.push(doctor);
-          }
-        });
-        loadedChunks.add(chunkKey);
+
+        const url = `data_chunks/chunk_${chunkKey}.json.gz`;
+        try {
+          const response = await fetch(url);
+          let chunkData;
+
+          const blob = await response.blob();
+          const decompressedData = await decompressGzip(blob);
+          chunkData = JSON.parse(decompressedData);
+
+          chunkData.forEach((doctor) => {
+            if (addUniqueDoctor(doctor)) {
+              allDoctors.push(doctor);
+            }
+          });
+          loadedChunks.add(chunkKey);
+        } catch (error) {
+          console.error(`Error loading chunk ${chunkKey}:`, error);
+        }
+      }
+
+      // Function to decompress GZIP data
+      async function decompressGzip(blob) {
+        const ds = new DecompressionStream('gzip');
+        const decompressedStream = blob.stream().pipeThrough(ds);
+        return await new Response(decompressedStream).text();
       }
 
       const loadChunks = async (chunks) => {
@@ -144,6 +301,13 @@
       };
 
       async function searchDoctors() {
+        // Clear previous results
+        markers.clearLayers();
+        uniqueDoctors.clear();
+        markerMap.clear();
+        allDoctors = [];
+        loadedChunks.clear();
+
         const name = document
           .getElementById("nameInput")
           .value.trim()
@@ -213,13 +377,37 @@
         });
 
         addMarkers(filteredDoctors);
+
+        // Update doctor count
+        const doctorCount = document.createElement('p');
+        doctorCount.textContent = `${filteredDoctors.length} Ärzte gefunden`;
+        document.getElementById('doctorList').prepend(doctorCount);
       }
 
       function clearSearch() {
         document.getElementById("nameInput").value = "";
         document.getElementById("fachSelect").value = "";
         document.getElementById("districtSelect").value = "";
-        // loadAllDoctors();
+
+        // Clear the doctor list
+        const doctorListElement = document.getElementById('doctorList');
+        doctorListElement.innerHTML = '';
+
+        // Clear all markers from the map
+        markers.clearLayers();
+
+        // Reset the map view to the initial state
+        map.setView([48.2082, 16.3738], 12);
+
+        // Clear the allDoctors array and uniqueDoctors set
+        allDoctors = [];
+        uniqueDoctors.clear();
+
+        // Clear the markerMap
+        markerMap.clear();
+
+        // Clear loaded chunks
+        loadedChunks.clear();
       }
 
       async function loadAllDoctors() {
@@ -249,6 +437,13 @@
           );
         } else {
           alert("Geolocation wird von Ihrem Browser nicht unterstützt.");
+        }
+      }
+
+      // Add this new function after the clearSearch function
+      function handleEnterKey(event) {
+        if (event.key === "Enter") {
+          searchDoctors();
         }
       }
 
@@ -294,6 +489,9 @@
           // loadAllDoctors(); // Load all doctors initially
         })
         .catch((error) => console.error("Error loading data:", error));
+
+      // Handle key press
+      document.getElementById("nameInput").addEventListener("keyup", handleEnterKey);
     </script>
   </body>
 </html>

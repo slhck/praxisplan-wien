@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 #
-# Download dataset for Praxisplan.
+# Download dataset for Praxisplan and PMTiles (disabled for now)
 #
 # https://www.data.gv.at/katalog/dataset/fdcaabe5-0efd-4701-8fd9-49935c0d9cff#resources
-#
 # https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&typeName=ogdwien:ARZTOGD&srsName=EPSG:4326&outputFormat=json
 
 import argparse
@@ -109,10 +108,10 @@ def main():
         ["curl", "--version"],
         "curl is required to download data. Please install it and try again.",
     )
-    check_command_exists(
-        ["pmtiles", "version"],
-        "pmtiles is required to download map tiles. Please install it and try again.",
-    )
+    # check_command_exists(
+    #     ["pmtiles", "version"],
+    #     "pmtiles is required to download map tiles. Please install it and try again.",
+    # )
 
     if not args.no_download_data:
         download_data(args.force)
@@ -124,8 +123,8 @@ def main():
         bounding_box = get_bounding_box(data)
         print(f"Found bounding box: {bounding_box}")
 
-        print("Downloading tiles, this may take a while...")
-        download_tiles(bounding_box, args.force)
+        # print("Downloading tiles, this may take a while...")
+        # download_tiles(bounding_box, args.force)
 
     print("Done!")
 

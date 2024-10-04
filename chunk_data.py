@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 #
-# chunk the data into smaller files.
+# Chunk the data into smaller files.
+#
+# We split the data into chunks by last name's first letter and district.
+# We also split the data into chunks by Fach and district.
+# This allows us to query more efficiently because most users will either pick name/district or Fach/district.
 
+import gzip
 import hashlib
 import json
 import os
@@ -15,7 +20,8 @@ def get_district(address):
 
 
 def write_chunk(filename, data):
-    with open(filename, "w") as f:
+    # Write GZIP-compressed JSON
+    with gzip.open(filename + ".gz", "wt", encoding="UTF-8") as f:
         json.dump(data, f)
 
 

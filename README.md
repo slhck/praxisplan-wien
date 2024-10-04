@@ -2,9 +2,11 @@
 
 This repository contains a simple web app to search for doctors in Vienna, Austria.
 
+Contrary to the original [Praxisplan](https://www.praxisplan.at/), it has a map.
+
 ## Data
 
-The data is sourced from the [Wien.gv.at](https://www.wien.gv.at/statistik/gesundheit/arzt-und-zahnarzt/arzt-und-zahnarzt-daten.html) website.
+The data is sourced from the [data.gv.at](https://www.data.gv.at/katalog/dataset/arzte-standorte-wien) website.
 
 The data format is a parent object with a `features` array. Each feature has a `geometry` object with a `Point` and a `properties` object.
 
@@ -34,6 +36,10 @@ Here is an example of a feature:
 }
 ```
 
+We chunk these into smaller files, one for each letter of the alphabet and each district, and one for each specialty and district.
+
+These chunks are then dynamically loaded based on the user's search query, via GZIP.
+
 ## Usage
 
 ```bash
@@ -45,8 +51,18 @@ Then open `index.html` in your browser.
 
 Note: This is still using OpenStreetMap tiles, rather than the PMTiles tiles.
 
+## Background and TODO
+
+This was an attempt to see how much Cursor and Claude 3.5 Sonnet could do for a simple task like this, with little manual interventions in the actual code.
+Some things are still TODO:
+
+- [ ] Use PMTiles tiles for real offline usage
+- [ ] Improve search to be a bit more fuzzy (but make it work with the chunks)
+- [ ] Implement URL-based state recording so we can share links to specific doctors or search results
+- [ ] Simplify the map style
+
 ## License
 
 Dataset is licensed under the [Creative Commons BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.en) license.
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE.md](LICENSE.md) file for details.
