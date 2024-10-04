@@ -56,6 +56,8 @@ Note: This is still using OpenStreetMap tiles, rather than the PMTiles tiles.
 This was an attempt to see how much Cursor and Claude 3.5 Sonnet could do for a simple task like this, with little manual interventions in the actual code.
 Some things are still TODO:
 
+- [ ] Points in users' vicinity should be highlighted already when location is known -- but this requires a different data structure because we don't have the user's location as a district
+- [ ] Some data points are obviously wrong
 - [ ] Use PMTiles tiles for real offline usage
 - [ ] Improve search to be a bit more fuzzy (but make it work with the chunks)
 - [ ] Implement URL-based state recording so we can share links to specific doctors or search results
