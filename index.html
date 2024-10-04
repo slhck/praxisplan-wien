@@ -108,7 +108,7 @@
       }
       #locationButton {
         position: absolute;
-        bottom: 20px;
+        top: 20px;
         right: 20px;
         z-index: 1000;
         background: white;
@@ -190,9 +190,91 @@
         margin-top: 10px;
         font-size: 18px;
       }
+
+      /* Add these new styles */
+      #sidebarToggle {
+        display: none;
+        position: fixed;
+        top: 10px; /* Increased from 10px to 80px */
+        left: 10px;
+        z-index: 1000;
+        background: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+        }
+
+        #sidebar {
+          position: fixed;
+          left: -350px;
+          top: 0;
+          bottom: 0;
+          z-index: 1001;
+          transition: left 0.3s ease-in-out;
+        }
+
+        #sidebar.open {
+          left: 0;
+        }
+
+        #sidebarToggle {
+          display: block;
+        }
+
+        #map {
+          width: 100%;
+          height: 100%;
+        }
+      }
+
+      /* Hamburger icon styles */
+      .hamburger {
+        width: 30px;
+        height: 20px;
+        position: relative;
+      }
+
+      .hamburger span {
+        display: block;
+        position: absolute;
+        height: 3px;
+        width: 100%;
+        background: var(--primary-color);
+        border-radius: 3px;
+        opacity: 1;
+        left: 0;
+        transform: rotate(0deg);
+        transition: .25s ease-in-out;
+      }
+
+      .hamburger span:nth-child(1) {
+        top: 0px;
+      }
+
+      .hamburger span:nth-child(2) {
+        top: 8px;
+      }
+
+      .hamburger span:nth-child(3) {
+        top: 16px;
+      }
     </style>
   </head>
   <body>
+    <button id="sidebarToggle">
+      <div class="hamburger">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </button>
     <div class="container">
       <div id="sidebar">
         <h1>Praxisplan Wien</h1>
@@ -226,7 +308,12 @@
       <div id="loadingText">Lade Daten...</div>
     </div>
     <script>
-      const map = L.map("map").setView([48.2082, 16.3738], 12);
+      const map = L.map("map", { zoomControl: false }).setView([48.2082, 16.3738], 12);
+
+      // add zoom control bottom right
+      L.control.zoom({
+        position: "bottomright",
+      }).addTo(map);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution:
@@ -553,6 +640,26 @@
 
       // Handle key press
       document.getElementById("nameInput").addEventListener("keyup", handleEnterKey);
+
+      // Add this new function at the end of your script
+      function initMobileSidebar() {
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('sidebar');
+
+        sidebarToggle.addEventListener('click', () => {
+          sidebar.classList.toggle('open');
+        });
+
+        // Close sidebar when clicking outside of it
+        document.addEventListener('click', (event) => {
+          if (!sidebar.contains(event.target) && !sidebarToggle.contains(event.target)) {
+            sidebar.classList.remove('open');
+          }
+        });
+      }
+
+      // Call this function after the page loads
+      window.addEventListener('load', initMobileSidebar);
     </script>
   </body>
 </html>
