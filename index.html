@@ -149,6 +149,47 @@
       #footer a:hover {
         text-decoration: underline;
       }
+      #loadingOverlay {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+      }
+
+      #loadingOverlay.active {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .spinner {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid var(--primary-color);
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      #loadingText {
+        color: white;
+        margin-top: 10px;
+        font-size: 18px;
+      }
     </style>
   </head>
   <body>
@@ -180,6 +221,10 @@
     <button id="locationButton" onclick="getCurrentLocation()">
       Mein Standort
     </button>
+    <div id="loadingOverlay">
+      <div class="spinner"></div>
+      <div id="loadingText">Lade Daten...</div>
+    </div>
     <script>
       const map = L.map("map").setView([48.2082, 16.3738], 12);
 
@@ -264,11 +309,115 @@
         }
       }
 
+      function showLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.classList.add('active');
+      }
+
+      function hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.classList.remove('active');
+      }
+
+      async function searchDoctors() {
+        showLoading();
+        try {
+          // Clear previous results
+          markers.clearLayers();
+          uniqueDoctors.clear();
+          markerMap.clear();
+          allDoctors = [];
+          loadedChunks.clear();
+
+          const name = document.getElementById("nameInput").value.trim().toUpperCase();
+          const fach = document.getElementById("fachSelect").value;
+          const district = document.getElementById("districtSelect").value;
+
+          if (name === "" && fach === "" && district === "") {
+            alert("Bitte geben Sie einen Namen, ein Fach oder einen Bezirk ein.");
+            return;
+          }
+
+          // relevant chunks are:
+          // - If only name is set, the chunk that contains the first letter of the name
+          // - If only fach is set, the chunk that contains the fach
+          // - If only district is set, then search by name chunks (but not fach chunks)
+          // - If name and district are set, then search by name chunks (but not fach chunks)
+          // - If name and fach are set, then search by name chunks (but not district chunks)
+          // - If fach and district are set, then search by fach chunks (but not name chunks)
+          // - If all are set, then search by name chunks (but not fach chunks)
+
+          const relevantNameChunks = dataIndex.name_chunks.filter((chunk) => {
+            const [_, letter, chunkDistrict] = chunk.split("_");
+            return (
+              (name === "" || letter === name[0]) &&
+              (district === "" || chunkDistrict === district)
+            );
+          });
+
+          const sanitizedFach = Object.keys(dataIndex.fach_mapping).find(
+            (key) => dataIndex.fach_mapping[key] === fach
+          );
+          const relevantFachChunks = dataIndex.fach_chunks.filter((chunk) => {
+            const [_, chunkFach, chunkDistrict] = chunk.split("_");
+            return (
+              (fach === "" || chunkFach === sanitizedFach) &&
+              (district === "" || chunkDistrict === district)
+            );
+          });
+
+          // Load the right set of chunks
+          const chunksToLoad = [];
+          if (name !== "") {
+            chunksToLoad.push(...relevantNameChunks);
+          } else if (fach !== "" && name === "") {
+            chunksToLoad.push(...relevantFachChunks);
+          } else if (name !== "" && fach !== "") {
+            chunksToLoad.push(...relevantNameChunks);
+          } else if (district !== "" && name === "") {
+            chunksToLoad.push(...relevantNameChunks);
+          } else if (district !== "" && fach !== "") {
+            chunksToLoad.push(...relevantFachChunks);
+          }
+          console.log("Chunks to load:", chunksToLoad);
+          await loadChunks(chunksToLoad);
+
+          const filteredDoctors = allDoctors.filter((doctor) => {
+            const doctorName = doctor.properties.NAME.toUpperCase();
+            const doctorFach = doctor.properties.FACH.toUpperCase();
+            const doctorDistrict =
+              doctor.properties.ADRESSE.split(",")[0].split(".")[0];
+            return (
+              (name === "" || doctorName.includes(name)) &&
+              (fach === "" || doctorFach === fach.toUpperCase()) &&
+              (district === "" || doctorDistrict === district)
+            );
+          });
+
+          addMarkers(filteredDoctors);
+
+          // Update doctor count
+          const doctorCount = document.createElement('p');
+          doctorCount.textContent = `${filteredDoctors.length} Ärzte gefunden`;
+          document.getElementById('doctorList').prepend(doctorCount);
+        } finally {
+          hideLoading();
+        }
+      }
+
+      async function loadChunks(chunks) {
+        for (const chunk of chunks) {
+          await loadChunk(chunk);
+        }
+      }
+
+      // Modify the loadChunk function to show loading state
       async function loadChunk(chunkKey) {
         if (loadedChunks.has(chunkKey)) return;
 
         const url = `data_chunks/chunk_${chunkKey}.json.gz`;
         try {
+          showLoading();
           const response = await fetch(url);
           let chunkData;
 
@@ -276,14 +425,16 @@
           const decompressedData = await decompressGzip(blob);
           chunkData = JSON.parse(decompressedData);
 
-          chunkData.forEach((doctor) => {
+          for (const doctor of chunkData) {
             if (addUniqueDoctor(doctor)) {
               allDoctors.push(doctor);
             }
-          });
+          }
           loadedChunks.add(chunkKey);
         } catch (error) {
           console.error(`Error loading chunk ${chunkKey}:`, error);
+        } finally {
+          hideLoading();
         }
       }
 
@@ -292,96 +443,6 @@
         const ds = new DecompressionStream('gzip');
         const decompressedStream = blob.stream().pipeThrough(ds);
         return await new Response(decompressedStream).text();
-      }
-
-      const loadChunks = async (chunks) => {
-        for (const chunk of chunks) {
-          await loadChunk(chunk);
-        }
-      };
-
-      async function searchDoctors() {
-        // Clear previous results
-        markers.clearLayers();
-        uniqueDoctors.clear();
-        markerMap.clear();
-        allDoctors = [];
-        loadedChunks.clear();
-
-        const name = document
-          .getElementById("nameInput")
-          .value.trim()
-          .toUpperCase();
-        const fach = document.getElementById("fachSelect").value;
-        const district = document.getElementById("districtSelect").value;
-
-        if (name === "" && fach === "" && district === "") {
-          alert("Bitte geben Sie einen Namen, ein Fach oder einen Bezirk ein.");
-          return;
-        }
-
-        // relevant chunks are:
-        // - If only name is set, the chunk that contains the first letter of the name
-        // - If only fach is set, the chunk that contains the fach
-        // - If only district is set, then search by name chunks (but not fach chunks)
-        // - If name and district are set, then search by name chunks (but not fach chunks)
-        // - If name and fach are set, then search by name chunks (but not district chunks)
-        // - If fach and district are set, then search by fach chunks (but not name chunks)
-        // - If all are set, then search by name chunks (but not fach chunks)
-
-        const relevantNameChunks = dataIndex.name_chunks.filter((chunk) => {
-          const [_, letter, chunkDistrict] = chunk.split("_");
-          return (
-            (name === "" || letter === name[0]) &&
-            (district === "" || chunkDistrict === district)
-          );
-        });
-
-        const sanitizedFach = Object.keys(dataIndex.fach_mapping).find(
-          (key) => dataIndex.fach_mapping[key] === fach
-        );
-        const relevantFachChunks = dataIndex.fach_chunks.filter((chunk) => {
-          const [_, chunkFach, chunkDistrict] = chunk.split("_");
-          return (
-            (fach === "" || chunkFach === sanitizedFach) &&
-            (district === "" || chunkDistrict === district)
-          );
-        });
-
-        // Load the right set of chunks
-        const chunksToLoad = [];
-        if (name !== "") {
-          chunksToLoad.push(...relevantNameChunks);
-        } else if (fach !== "" && name === "") {
-          chunksToLoad.push(...relevantFachChunks);
-        } else if (name !== "" && fach !== "") {
-          chunksToLoad.push(...relevantNameChunks);
-        } else if (district !== "" && name === "") {
-          chunksToLoad.push(...relevantNameChunks);
-        } else if (district !== "" && fach !== "") {
-          chunksToLoad.push(...relevantFachChunks);
-        }
-        console.log("Chunks to load:", chunksToLoad);
-        await loadChunks(chunksToLoad);
-
-        const filteredDoctors = allDoctors.filter((doctor) => {
-          const doctorName = doctor.properties.NAME.toUpperCase();
-          const doctorFach = doctor.properties.FACH.toUpperCase();
-          const doctorDistrict =
-            doctor.properties.ADRESSE.split(",")[0].split(".")[0];
-          return (
-            (name === "" || doctorName.includes(name)) &&
-            (fach === "" || doctorFach === fach.toUpperCase()) &&
-            (district === "" || doctorDistrict === district)
-          );
-        });
-
-        addMarkers(filteredDoctors);
-
-        // Update doctor count
-        const doctorCount = document.createElement('p');
-        doctorCount.textContent = `${filteredDoctors.length} Ärzte gefunden`;
-        document.getElementById('doctorList').prepend(doctorCount);
       }
 
       function clearSearch() {
