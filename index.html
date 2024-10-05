@@ -206,8 +206,8 @@
       #sidebarToggle {
         display: none;
         position: fixed;
-        top: 10px;
-        left: 10px;
+        top: 20px;
+        left: 20px;
         z-index: 1000;
         background: var(--white);
         border: none;
@@ -335,8 +335,6 @@
       <div id="loadingText">Lade Daten...</div>
     </div>
     <script>
-      // Add these new functions at the beginning of the script
-
       function updateURLParams() {
         const center = map.getCenter();
         const zoom = map.getZoom();
@@ -418,7 +416,6 @@
         return false;
       }
 
-      // Function to create a popup content
       function createPopupContent(properties) {
         return `
                 <a class="doctor-link" href="${
@@ -432,7 +429,6 @@
             `;
       }
 
-      // Function to add markers to the map
       function addMarkers(doctors) {
         markers.clearLayers();
         uniqueDoctors.clear();
@@ -587,7 +583,6 @@
         }
       }
 
-      // Modify the loadChunk function to show loading state
       async function loadChunk(chunkKey) {
         if (loadedChunks.has(chunkKey)) return;
 
@@ -614,7 +609,6 @@
         }
       }
 
-      // Function to decompress GZIP data
       async function decompressGzip(blob) {
         const ds = new DecompressionStream("gzip");
         const decompressedStream = blob.stream().pipeThrough(ds);
@@ -630,23 +624,17 @@
         const doctorListElement = document.getElementById("doctorList");
         doctorListElement.innerHTML = "";
 
-        // Clear all markers from the map
         markers.clearLayers();
 
-        // Reset the map view to the initial state
         map.setView([48.2082, 16.3738], 12);
 
-        // Clear the allDoctors array and uniqueDoctors set
         allDoctors = [];
         uniqueDoctors.clear();
 
-        // Clear the markerMap
         markerMap.clear();
 
-        // Clear loaded chunks
         loadedChunks.clear();
 
-        // Update URL params after clearing
         updateURLParams();
       }
 
@@ -658,7 +646,6 @@
         addMarkers(allDoctors);
       }
 
-      // Function to get and focus on the current location
       function getCurrentLocation() {
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition(
@@ -680,7 +667,6 @@
         }
       }
 
-      // Add this new function after the clearSearch function
       function handleEnterKey(event) {
         if (event.key === "Enter") {
           searchDoctors();
@@ -731,12 +717,11 @@
         })
         .catch((error) => console.error("Error loading data:", error));
 
-      // Handle key press
+      // Handle Enter key press
       document
         .getElementById("nameInput")
         .addEventListener("keyup", handleEnterKey);
 
-      // Add this new function at the end of your script
       function initMobileSidebar() {
         const sidebarToggle = document.getElementById("sidebarToggle");
         const sidebar = document.getElementById("sidebar");
