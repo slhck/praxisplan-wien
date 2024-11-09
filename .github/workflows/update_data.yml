@@ -2,7 +2,8 @@ name: Update Data
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    # update every week on Monday
+    - cron: "0 0 * * 1"
   # manual trigger
   workflow_dispatch:
 
