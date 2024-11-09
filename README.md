@@ -8,6 +8,8 @@ Contrary to the original [Praxisplan](https://www.praxisplan.at/), it has a map.
 
 The data is sourced from the [data.gv.at](https://www.data.gv.at/katalog/dataset/arzte-standorte-wien) website.
 
+It is updated automatically every Monday.
+
 The data format is a parent object with a `features` array. Each feature has a `geometry` object with a `Point` and a `properties` object.
 
 Here is an example of a feature:
@@ -57,10 +59,11 @@ This was an attempt to see how much Cursor and Claude 3.5 Sonnet could do for a 
 Some things are still TODO:
 
 - [ ] Points in users' vicinity should be highlighted already when location is known -- but this requires a different data structure because we don't have the user's location as a district
-- [ ] Some data points are obviously wrong
-- [ ] Use PMTiles tiles for real offline usage
+- [ ] Some data points are obviously wrong, not our fault
 - [ ] Improve search to be a bit more fuzzy (but make it work with the chunks)
+- [ ] Better color for clusters
 - [ ] Simplify the map style
+- [ ] Use PMTiles tiles for real offline usage?
 
 ## License
 
